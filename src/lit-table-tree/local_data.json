@@ -1,0 +1,78 @@
+{
+    "title":"Título da tabela",
+    "headers":[
+        {"id":1,"value":"header1","type":"text", "format":null},
+        {"id":2,"value":"header2","type":"text", "format":null},
+        {"id":3,"value":"header3","type":"text", "format":null},
+        {"id":4,"value":"header4","type":"text", "format":null},
+        {"id":5,"value":"header5","type":"text", "format":null}
+    ],
+    "subheaders":[
+        {"id":1,"value":"header1","type":"text", "format":null},
+        {"id":2,"value":"header2","type":"text", "format":null},
+        {"id":3,"value":"header3","type":"text", "format":null},
+        {"id":4,"value":"header4","type":"text", "format":null},
+        {"id":5,"value":"header5","type":"text", "format":null}
+    ],
+    "data":[
+        {
+            "parent":["cell11", "cell12", "cell13", "cell14", "cell15"],
+            "children":[
+                {
+                    "parent":["cell111", "cell112", "cell113", "cell114", "cell115"],
+                    "children":[]
+                },
+                {
+                    "parent":["cell211", "cell212", "cell213", "cell214", "cell215"],
+                    "children":[]
+                },
+                {
+                    "parent":["cell311", "cell312", "cell313", "cell314", "cell315"],
+                    "children":[]
+                }
+            ]
+        },
+        {
+            "parent":["cell21", "cell22", "cell23", "cell24", "cell25"],
+            "children":[]
+        },
+        {
+            "parent":["cell31", "cell32", "cell33", "cell34", "cell35"],
+            "children":[
+                {
+                    "parent":["cell131", "cell132", "cell133", "cell134", "cell135"],
+                    "children":[]
+                },
+                {
+                    "parent":["cell231", "cell232", "cell233", "cell234", "cell235"],
+                    "children":[]
+                },
+                {
+                    "parent":["cell331", "cell332", "cell333", "cell334", "cell335"],
+                    "children":[]
+                }
+            ]
+        },
+        {
+            "parent":["cell41", "cell42", "cell43", "cell44", "cell45"],
+            "children":[]
+        },
+        {
+            "parent":["cell51", "cell52", "cell53", "cell54", "cell55"],
+            "children":[
+                {
+                    "parent":["cell151", "cell152", "cell153", "cell154", "cell155"],
+                    "children":[]
+                },
+                {
+                    "parent":["cell251", "cell252", "cell253", "cell254", "cell255"],
+                    "children":[]
+                },
+                {
+                    "parent":["cell351", "cell352", "cell353", "cell354", "cell355"],
+                    "children":[]
+                }
+            ]
+        }
+    ]
+}
