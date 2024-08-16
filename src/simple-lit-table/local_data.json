@@ -1,0 +1,25 @@
+{
+    "title":"Título da tabela",
+    "selectable":"column",
+    "headers":[
+        {"id":1,"value":"header1","type":"text", "format":null},
+        {"id":2,"value":"header2","type":"text", "format":null},
+        {"id":3,"value":"header3","type":"text", "format":null},
+        {"id":4,"value":"header4","type":"text", "format":null},
+        {"id":5,"value":"header5","type":"text", "format":null}
+    ],
+    "subheaders":[
+        {"id":1,"value":"header1","type":"text", "format":null},
+        {"id":2,"value":"header2","type":"text", "format":null},
+        {"id":3,"value":"header3","type":"text", "format":null},
+        {"id":4,"value":"header4","type":"text", "format":null},
+        {"id":5,"value":"header5","type":"text", "format":null}
+    ],
+    "data":[
+        ["cell11", "cell21", "cell31", "cell41", "cell51"], 
+        ["cell12", "cell22", "cell32", "cell42", "cell52"],
+        ["cell13", "cell23", "cell33", "cell43", "cell53"], 
+        ["cell14", "cell24", "cell34", "cell44", "cell54"], 
+        ["cell15", "cell25", "cell35", "cell45", "cell55"]
+    ]
+}
