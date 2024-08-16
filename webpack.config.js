@@ -8,7 +8,8 @@ const htmlPlugin = new HtmlWebpackPlugin(
 
 module.exports = {
   entry: './src/index.ts',
-  mode:"production",
+  watch: true,
+  mode:"development",
   devtool: 'inline-source-map',
   output: {
     filename: '[name].js',
@@ -34,13 +35,17 @@ module.exports = {
             exclude: /node_modules/,
         },
         {
-            test: /\.css$/i,
-            use: ['style-loader', 'css-loader'],
+          test: /\.(s?)css$/,
+          use: [
+            {loader: "to-string-loader"}, 
+            {loader: "css-loader"},
+            {loader: "sass-loader"}
+          ],
         }
     ]
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
+    extensions: ['.tsx', '.ts', '.js', ".scss", "css"],
   },
   plugins: [htmlPlugin]
 };

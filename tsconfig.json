@@ -7,10 +7,14 @@
       "sourceMap": true,
       "noEmitOnError": true,
       "moduleResolution": "Node",
-      "experimentalDecorators": true
+      "experimentalDecorators": true,
+      "skipLibCheck": true,
+      "resolveJsonModule": true,
+      "allowSyntheticDefaultImports":true
     },
     "include": [
-      "src/*.ts"
+      "src/*.ts",
+      "src/**/*.ts"
     ],
     "exclude": [
       "node-modules"
