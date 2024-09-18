@@ -24,6 +24,10 @@
   },
   "dependencies": {
     "@polymer/iron-icons": "^3.0.1",
-    "@polymer/paper-icon-button": "^3.0.2"
+    "@polymer/paper-icon-button": "^3.0.2",
+    "@types/geojson": "^7946.0.14",
+    "@types/leaflet": "^1.9.12",
+    "danfojs": "^1.1.2",
+    "leaflet": "^1.9.4"
   }
 }
