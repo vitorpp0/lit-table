@@ -7,7 +7,7 @@ export type AggConfig = Record<string,AggOperation>;
 export type GroupsIdentifier = Record<string, any>;
 export type GroupBy = Array<string>;
 
-export type ProcessControllerHost = ReactiveControllerHost & {data:DataRows}
+export type ProcessControllerHost = ReactiveControllerHost & {data:DataRows, keys:Array<string>}
 
 export class ProcessController implements ReactiveController {
     private host: ProcessControllerHost;
@@ -168,6 +168,7 @@ export class ProcessController implements ReactiveController {
     // handle default data
     setDefaultTable(elements:DataRows, keys:GroupBy, agg:AggConfig){
         this.nestedObject = this.groupByKeys(elements, keys);
+        this.host.keys = [...keys, ...Object.keys(agg)];
         this.table = this.buildLines(this.nestedObject, keys, agg, true)
         this.table.map(row=>{
             row['ctr_open'] = false;
