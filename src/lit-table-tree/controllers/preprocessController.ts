@@ -1,19 +1,19 @@
 import { ReactiveController, ReactiveControllerHost } from 'lit';
-import { DataFrame, toJSON } from 'danfojs';
 
-export type Operation = {value:string, prop:number, target:number, opIdx?:number, parent:number|null}; 
-export type ProcessControllerAggRules = {groupBy:Array<string>,apply:Record<string,string>}
-export type ProcessControllerHost = ReactiveControllerHost & {data:Array<any>,aggRules:ProcessControllerAggRules}
+export type DataRow = Record<string, any>;
+export type DataRows = Array<DataRow>;
+export type AggOperation = 'max' | 'min' | 'count' | 'mean';
+export type AggConfig = Record<string,AggOperation>;
+export type GroupsIdentifier = Record<string, any>;
+export type GroupBy = Array<string>;
 
+export type ProcessControllerHost = ReactiveControllerHost & {data:DataRows}
 
 export class ProcessController implements ReactiveController {
     private host: ProcessControllerHost;
-    private aggRules:ProcessControllerAggRules;
-    private dataframe: DataFrame;
-    public table:Array<any>;
-    public operations:Array<Operation>=[];
-    private operationsID:number = -1;
-
+    private nestedObject:any;
+    public table: DataRows;
+    private idIdx:number = -1;
 
     constructor(host: ProcessControllerHost) {
         this.host = host;
@@ -26,153 +26,201 @@ export class ProcessController implements ReactiveController {
     hostDisconnected() {
     }
 
-    setDataframe(){
-        if(this.host.data) this.dataframe = new DataFrame(this.host.data);
+    groupByKeys(elements:DataRows, keys:GroupBy) {
+        return elements.reduce((result, element) => {
+          let group = result;
+          keys.forEach((key, index) => {
+            const keyValue = element[key];
+            if (!group[keyValue]) {
+              group[keyValue] = index === keys.length - 1 ? [] : {};
+            }
+            group = group[keyValue];
+          });
+          group.push(element);
+          return result;
+        }, {});
     }
-
-    setAggRules(){
-        this.aggRules = this.host.aggRules;
-    }
-
-    
-    updateTable(){
-        let df:DataFrame;
-        if(this.aggRules && this.dataframe){
-            df = this.applyDefaultState();
-            df = this.applyOperations(df);
-        }else if(this.dataframe){
-            df = this.dataframe.copy();
+        
+    countObjectsAtEachLevel(nestedObject:any, keys:GroupBy) {
+        const result:any = {};
+      
+        function recurse(obj:any, level:number){ 
+          let col = keys[level];
+          if (!result[col]) {
+            result[col] = 0;
+          }
+          result[col] += 1;
+      
+          for (const key in obj){
+            if (typeof obj[key] === 'object' && obj[key] !== null && level+1<keys.length) {
+              recurse(obj[key], level + 1);
+            }
+          }
         }
-        if(df) this.table = toJSON(df) as Array<any>;
+      
+        recurse(nestedObject, 0);
+        return result;
+    }
+      
+    aggregateRows(nestedObject:any, agg:AggConfig){
+        let rows:DataRows = []
+      
+        function recurse(obj:any){
+          if(Array.isArray(obj)){
+            rows = rows.concat(obj);
+          }
+      
+          for(let key in obj){
+            if(typeof obj[key]==='object' && obj[key]!==null) recurse(obj[key]);
+          }
+        }
+        recurse(nestedObject)
+       
+        const line:Record<string,any> = {}
+        for(const [key, value] of Object.entries(agg)){
+          line[key] = this.apply(key, value, rows);
+        }
+        return line;
+    }
+      
+    apply(key:string, aggFunc:AggOperation, rows:DataRows){
+        switch(aggFunc){
+          case "mean":
+            return this.mean(rows, key);
+          case "max":
+            return this.max(rows, key);
+          case "min":
+            return this.min(rows, key);
+          default:
+            return this.count(rows);
+        }
+    }
+      
+    count(arr:DataRows) {
+        return arr.length;
+    }
+      
+    mean(arr:DataRows, key:string) {
+        return arr.reduce((sum, item) => sum + item[key], 0) / arr.length;
+    }
+      
+    max(arr:DataRows, key:string) {
+        return Math.max(...arr.map(item => item[key]));
+    }
+      
+    min(arr:DataRows, key:string) {
+        return Math.min(...arr.map(item => item[key]));
+    }
+      
+    buildLines(nestedObject:any, keys:GroupBy, agg:AggConfig, root:boolean=false){
+        let rows:DataRows = [];
+      
+        if(Array.isArray(nestedObject)){
+          rows = JSON.parse(JSON.stringify(nestedObject))
+            .map((row:DataRow)=>{return {...row, ctr_expansible:false}});
+        }else if(typeof nestedObject == 'object' && nestedObject!==null){
+          for(const [key, value] of Object.entries(nestedObject)){
+            let line:Record<string, any> = {};
+            line = {...this.countObjectsAtEachLevel(value, keys)};
+            line[keys[0]] = key;
+            line = {...this.aggregateRows(value, agg), ...line, ctr_expansible:true};
+            if(root){
+                this.idIdx+=1;
+                line['idIdx'] = this.idIdx;
+            }
+            rows.push(line);
+          }
+        }
+        return rows;
+    }
+      
+    getGroup(groupID:GroupsIdentifier, nestedObject:any, keys:GroupBy){
+        let group = JSON.parse(JSON.stringify(nestedObject));
+        for(const key of keys){
+          if(Object.keys(groupID).includes(key)){
+            group = group[groupID[key]]
+          }else{
+            break;
+          }
+        }
+        return group
+    }
+      
+    getGroupKeys(keys:GroupBy, groupID:GroupsIdentifier){
+        const filterKeys = Object.keys(groupID);
+        return keys.filter(key=>!filterKeys.includes(key))
+    }
+      
+    getExpandGroupRows(groupID:GroupsIdentifier, keys:GroupBy, nestedObject:any, agg:AggConfig){
+        const meta:Record<string, any> = Object.keys(groupID)
+          .reduce((agg:Record<string, any>, cur)=>{
+            if(cur!='idIdx') agg[cur]=null;
+            return agg;
+          }, {});
+        meta['parent'] = groupID;
+      
+        const obj = this.getGroup(groupID, nestedObject, keys);
+        const groupKeys = this.getGroupKeys(keys, groupID);
+        const lines = this.buildLines(obj, groupKeys, agg);
+        return lines.map(line=>{return {...line, ...meta}});
+    }
+
+    // handle default data
+    setDefaultTable(elements:DataRows, keys:GroupBy, agg:AggConfig){
+        this.nestedObject = this.groupByKeys(elements, keys);
+        this.table = this.buildLines(this.nestedObject, keys, agg, true)
+        this.table.map(row=>{
+            row['ctr_open'] = false;
+            return row;
+        })
         this.host.requestUpdate();
     }
 
-    // handle expand/contract events
-    applyDefaultState():DataFrame{
-        const df:DataFrame = this.dataframe
-            .groupby([this.aggRules.groupBy[0]])
-            .agg({
-                ...this.aggRules.groupBy.slice(1).reduce((acc:any, cur)=>{
-                    acc[cur] = 'count';
-                    return acc;
-                }, {}),
-                ...this.aggRules.apply, 
-            });
-        const nRows = df.shape[0]
-        df.addColumn('ctrl_expansible',Array(nRows).fill(true), {inplace:true});
-        df.addColumn('ctrl_open',Array(nRows).fill(false), {inplace:true});
-        df.addColumn('ctrl_parent',Array(nRows).fill(null), {inplace:true});
-        return df
+    // handle expand
+    expandGroup(row:number, groupID:GroupsIdentifier, keys:GroupBy, agg:AggConfig){
+        this.table[row-1].ctr_open = true;
+        const rows = this.getExpandGroupRows(groupID, keys, this.nestedObject, agg);
+        this.table.splice(row, 0, ...rows);
+        this.host.requestUpdate();
     }
-
-    handleOpen(df_old:DataFrame, op:Operation):DataFrame{
-        const df = df_old.copy();
-        let ctrl_open_idx:number = df.columns.indexOf('ctrl_open');
-        console.log(df.values);
-        (df.values[op.target] as any)[ctrl_open_idx]= true;
-        return df;
-    }
-
-    applySecondaryAggregations(df_old:DataFrame, op:Operation):DataFrame{
-        let df:DataFrame = df_old.copy();
-        if(op.prop+1<this.aggRules.groupBy.length){
-            df = df.groupby([this.aggRules.groupBy[op.prop+1]])
-            .agg({
-                ...this.aggRules.groupBy.slice(op.prop+2).reduce((acc:any, cur)=>{
-                    acc[cur] = 'count';
-                    return acc;
-                }, {}),
-                ...this.aggRules.apply, 
-            });
-        }else{
-            df.drop({ columns:this.aggRules.groupBy, inplace: true });
-            df = df.copy();
-        };
-        return df
-    }
-
-    recoverGroupColumns(df_old:DataFrame, op:Operation){
-        const df = df_old.copy();
-        for(let prop of this.aggRules.groupBy.slice(0, op.prop+1)){
-            df.addColumn(prop, Array(df.shape[0]).fill(null),{inplace:true})
-        }
-        return df;
-    }
-
-    addControlColumns(df_old:DataFrame, op:Operation, idx:number):DataFrame{
-        let df = df_old.copy()
-        const final_cols = [...df.columns.slice(-(op.prop+1)), ...df.columns.slice(0, -(op.prop+1))];
-        df = df.loc({columns:final_cols});
-        df.addColumn('ctrl_expansible',Array(df.shape[0]).fill(op.prop+1<this.aggRules.groupBy.length), {inplace:true});
-        df.addColumn('ctrl_open',Array(df.shape[0]).fill(false), {inplace:true});
-        df.addColumn('ctrl_parent',Array(df.shape[0]).fill(idx), {inplace:true});
-        return df;
-    }
-
-    mergedf(baseDF:DataFrame, dfToMerge:DataFrame, op:Operation){
-        return new DataFrame(
-            [...baseDF.values.slice(0,op.target+1), ...dfToMerge.values, ...baseDF.values.slice(op.target+1)],
-            {columns:baseDF.columns}
-        )
-    }
-
-    applyOperations(old_df:DataFrame):DataFrame{
-        let df = old_df.copy();
-        const orgDF = this.dataframe.copy()
-        this.operations.forEach((op,idx)=>{
-            df = this.handleOpen(df, op);
-            let dfToMerge:DataFrame = orgDF.loc({rows:orgDF[this.aggRules.groupBy[op.prop]].eq(op.value)});
-            dfToMerge = this.applySecondaryAggregations(dfToMerge, op);
-            dfToMerge = this.recoverGroupColumns(dfToMerge, op);
-            dfToMerge = this.addControlColumns(dfToMerge,op, idx);
-            df = this.mergedf(df,dfToMerge,op);
-        })
-        return df; 
-    }
-
-    // close handle
-    setOperation(operation:Operation){
-        const opIdx:number = this.findOperation(operation);
-        console.log(opIdx)
-        console.log(this.operations)
-        if(opIdx==-1){
-            this.operationsID+=1;
-            operation.opIdx = this.operationsID;
-            this.operations.push(operation)
-        }else{
-            const toDeleteOpIdx = this.getChainBlock(operation);
-            this.operations = this.operations.filter(op=>!toDeleteOpIdx.includes(op.opIdx));
-        }
-        this.updateTable();
-    }
-
-    getChainBlock(selected:Operation, memoization:Array<number>=[]){
-        if(memoization.length==0){
-            let opToDelete = this.findOperation(selected);
-            opToDelete = opToDelete==-1 ? -1 : this.operations[opToDelete].opIdx;
-            if(opToDelete!=-1 && !memoization.includes(opToDelete)){
-                memoization.push(opToDelete);
-                this.getChainBlock(this.operations[opToDelete], memoization);
+      
+    isChild(row:DataRow, parent:GroupsIdentifier){
+        if(row.parent){
+          for(let key in parent){
+            if(Object.keys(row.parent).includes(key)){
+              if(row.parent[key] != parent[key]){
+                return false;
+              }
+            }else{
+              return false;
             }
+          }
         }else{
-            this.operations.filter(op=>op.parent==memoization.slice(-1)[0])
-            .map(op=>this.findOperation(op))
-            .forEach(opIdx=>{
-                opIdx = opIdx==-1 ? opIdx : this.operations[opIdx].opIdx
-                if(opIdx!=-1 && !memoization.includes(opIdx)){
-                    memoization.push(opIdx);
-                    this.getChainBlock(this.operations[opIdx], memoization);
-                }
-            });
+          return false
         }
-        return memoization
+        return true
     }
     
-    findOperation(selected:Operation){
-        return this.operations.findIndex(op=>{
-            return op.value == selected.value &&
-              op.prop==selected.prop && 
-              op.parent == selected.parent
-        })
+    // handle contract
+    dropRows(row:number, parent:GroupsIdentifier){
+        this.table[row].ctr_open = false;
+        this.table = this.table.filter(row=>!this.isChild(row, parent));
+        this.host.requestUpdate();
+    }
+
+    // get group by row
+    getGroupID(row:DataRow, key:string){
+        let groupID:GroupsIdentifier = {};
+        if(row.ctr_expansible){
+            if(row.parent){
+                groupID = {...row.parent};  
+                groupID[key] = row[key];
+                return groupID;
+            }else{
+                groupID[key] = row[key];
+                groupID['idIdx'] = row.idIdx;
+                return groupID;
+            }
+        }
     }
 }
