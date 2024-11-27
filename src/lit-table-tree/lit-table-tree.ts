@@ -17,6 +17,7 @@ export class LitTableTree extends LitElement {
     @property({attribute:"group-by", type:Object}) groupBy:GroupBy;
     @property({attribute:'agg-rules', type:Object}) aggRules:AggConfig;
     @property({attribute:'keys', type:Object}) keys:Array<string>;
+    @property({attribute:'composed', type:Boolean}) composed:boolean=false;
 
     private processController = new ProcessController(this);
  
@@ -91,6 +92,7 @@ export class LitTableTree extends LitElement {
     }
 
     handleExpand(e:any, row:number, groupID:GroupsIdentifier){
+        this.dispatchEvent(new CustomEvent("row-select", {detail:this.processController.table[row], composed:this.composed}));
         if(e.target.icon=="icons:arrow-drop-down"){
             this.processController.expandGroup(row+1, groupID, this.groupBy, this.aggRules);
         }else{
